@@ -3,5 +3,5 @@
 .settings
 bin
 target
-log
+log/*.log
 *.pyc
