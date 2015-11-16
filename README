@@ -7,7 +7,7 @@
 
 2. 运行sentree爬虫
     a. cd zefun_spider
-    b. 查  看和修改配置: vi zefun_spider/settings.py, 主要注意result_dir和redis的配置, result_dir是指抓取结果的存放目录
+    b. 查  看和修改配置: vi zefun_spider/settings.py, 主要注意result_dir和redis的配置及LOG_FILE, result_dir是指抓取结果的存放目录, LOG_FILE是指日志文件, 它和result_dir的文件夹路经都必须事先创建
     c. 开始运行: scrapy crawl sentree
     d. 查看爬虫日志, log/zefun_spider.log
     e. 查看结果, cd到前面配置的result_dir, 会出现3个xls文件, members_xxx.xls是会员资料, employees_xxx.xls是员工资料, services_xxx.xls是会员项目, membercards_xxx.xls是会员卡
