@@ -1,0 +1,7 @@
+.pydevproject
+.project
+.settings
+bin
+target
+*.log
+*.pyc
