@@ -86,19 +86,25 @@ class SentreeMembersSimpleItemPipeline(SentreeMembersRedisHelper):
 
         member[u'手机号'] = item['phone']
         member[u'姓名'] = item['name']
+        member[u'卡名称'] = item['card_name']
+        member[u'卡类型'] = item['card_type']
+        member[u'折扣'] = item['discont']
+        member[u'失效日期'] = item['timeout']
 
         spider.member_result_semaphore.acquire()
         while not spider.member_origin_result_ready:
             pass
+        hs = spider.member_headers
         if spider.member_result_rows == 0:
-            hs = member.keys()
             for i, h in enumerate(hs):
                 spider.member_result_xsl_sheet.write(0, i, h)
             spider.member_result_rows += 1
         r = spider.member_result_rows
-        vs = member.values()
-        for i, v in enumerate(vs):
-            spider.member_result_xsl_sheet.write(r, i, v)
+        for i, h in enumerate(hs):
+            spider.member_result_xsl_sheet.write(r, i, member[h])
+#         vs = member.values()
+#         for i, v in enumerate(vs):
+#             spider.member_result_xsl_sheet.write(r, i, v)
         spider.member_result_xsl_book.save(spider.member_result_xls)
         spider.member_result_rows += 1
         spider.member_result_semaphore.release()

@@ -28,6 +28,10 @@ class SentreeMembersSimpleItem(scrapy.Item):
     card_no = Field()
     phone = Field()
     name = Field()
+    card_name = Field()
+    card_type = Field()
+    discont = Field()
+    timeout = Field()
 
 class SentreeEmployeeItem(scrapy.Item):
     info = Field()

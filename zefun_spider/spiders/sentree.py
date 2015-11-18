@@ -45,6 +45,7 @@ class SentreeSpider(CommonSpider):
         self.member_result_rows = 0
         self.member_result_semaphore = multiprocessing.Semaphore(1)
         self.member_origin_result_ready = False
+        self.member_headers = [u'手机号', u'姓名', u'性别', u'会员分类', u'注册日期', u'卡号', u'卡名称', u'卡类型', u'折扣', u'储值总额', u'消费总额', u'卡内总余额', u'赠送总余额', u'失效日期', u'消费次数', u'当前积分', u'最后消费日']
 
         self.employee_result_semaphore = multiprocessing.Semaphore(1)
         self.employee_result_xls = '%s/employees_%d.xls' % (result_dir, self.start_time)
@@ -63,6 +64,7 @@ class SentreeSpider(CommonSpider):
         self.membercard_result_xsl_book = xlwt.Workbook()
         self.membercard_result_xsl_sheet = self.membercard_result_xsl_book.add_sheet(u'会员卡')
         self.membercard_result_rows = 0
+
 
     def start_requests(self):
         yield Request(url=self.start_urls[0], callback=self.preper_login, meta={'cookie_jar' : CookieJar()})
@@ -237,9 +239,9 @@ class SentreeSpider(CommonSpider):
         r = time.time()
         urls = {
                 'http://vip6.sentree.com.cn/shair/memberInfo!memberlist.action?set=manage&r=%d' % r  : [self.parse_showdesk_members, {'r' : r}],
-                'http://vip6.sentree.com.cn/shair/employee!employeeInfo.action?set=manage&r=%d' % r : [self.parse_showdesk_employees, {'r' : r}],
-                'http://vip6.sentree.com.cn/shair/serviceItemSet!init.action?set=manage&r=%d' % r : [self.parse_showdesk_services, {'r' : r}],
-                'http://vip6.sentree.com.cn/shair/cardTypeSet!getList.action?set=manage&r=%d' % r : [self.parse_showdesk_membercards, {'r' : r}],
+#                 'http://vip6.sentree.com.cn/shair/employee!employeeInfo.action?set=manage&r=%d' % r : [self.parse_showdesk_employees, {'r' : r}],
+#                 'http://vip6.sentree.com.cn/shair/serviceItemSet!init.action?set=manage&r=%d' % r : [self.parse_showdesk_services, {'r' : r}],
+#                 'http://vip6.sentree.com.cn/shair/cardTypeSet!getList.action?set=manage&r=%d' % r : [self.parse_showdesk_membercards, {'r' : r}],
                 }
         for url, info in urls.items():
             yield Request(url=url, callback=info[0], meta=info[1])
@@ -275,17 +277,25 @@ class SentreeSpider(CommonSpider):
                     phone = member_tds[1].xpath('a/child::text()').extract()[0].replace('&nbsp;', '').strip()
                     name = member_tds[2].xpath('span/child::text()').extract()[0].replace('&nbsp;', '').strip()
                     card_no = member_tds[6].xpath('table/tr/td[1]/a/child::text()').extract()[0].replace('&nbsp;', '').strip()
+                    card_name = member_tds[6].xpath('table/tr/td[2]/child::text()').extract()[0].replace('&nbsp;', '').strip()
+                    card_type = member_tds[6].xpath('table/tr/td[3]//child::text()').extract()[0].replace('&nbsp;', '').replace(' ', '').strip()
+                    discont = member_tds[6].xpath('table/tr/td[4]/child::text()').extract()[0].replace('&nbsp;', '').replace(' ', '').strip()
+                    timeout = member_tds[6].xpath('table/tr/td[9]/child::text()').extract()[0].replace('&nbsp;', '').replace(' ', '').strip()
                 except:
                     continue
                 mem_item = SentreeMembersSimpleItem()
                 mem_item[u'phone'] = phone
                 mem_item[u'name'] = name
                 mem_item[u'card_no'] = card_no
+                mem_item[u'card_name'] = card_name
+                mem_item[u'card_type'] = card_type
+                mem_item[u'discont'] = discont
+                mem_item[u'timeout'] = timeout
 #                 items.append(mem_item)
                 yield mem_item
         meta = resp.meta
         next_page_nodes = hxs.xpath('//a[@class="next_page"]')
-        if next_page_nodes and len(next_page_nodes) > 1:
+        if next_page_nodes and (len(next_page_nodes) > 1 or meta['page'] == 1):
             page = meta['page'] + 1
             meta['page'] = page
             yield FormRequest(url="http://vip6.sentree.com.cn/shair/memberInfo!memberlist.action", formdata={
