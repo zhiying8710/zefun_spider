@@ -73,7 +73,7 @@ class SentreeMembersCsvItemPipeline(SentreeMembersRedisHelper):
 
 class SentreeMembersSimpleItemPipeline(SentreeMembersRedisHelper):
 
-#     def spider_closed(self, spider):
+#     def close_spider(self, spider):
 #         spider.member_result_xsl_book.save(spider.member_result_xls)
 
     def process_item(self, item, spider):
