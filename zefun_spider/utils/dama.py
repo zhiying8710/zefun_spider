@@ -11,11 +11,11 @@ def __jsdati_dama__(filename):
     boundary = '----%s' % hex(int(time.time() * 1000))
     data = ['--%s' % boundary]
     data.append('Content-Disposition: form-data; name="%s"\r\n' % 'user_name')
-    data.append('dickyzeng')
+    data.append('qq491642740')
     data.append('--%s' % boundary)
 
     data.append('Content-Disposition: form-data; name="%s"\r\n' % 'user_pw')
-    data.append('3gfeidee')
+    data.append('livesALL2015')
     data.append('--%s' % boundary)
 
     data.append('Content-Disposition: form-data; name="%s"\r\n' % 'yzm_minlen')
@@ -31,7 +31,7 @@ def __jsdati_dama__(filename):
     data.append('--%s' % boundary)
 
     data.append('Content-Disposition: form-data; name="%s"\r\n' % 'zztool_token')
-    data.append('j8K17K05tGbg369k7uTLOO3T1t7x71kt01J8tgjk')
+    data.append('qq491642740')
     data.append('--%s' % boundary)
 
     fr=open(filename,'rb')

@@ -13,7 +13,13 @@ from urllib import urlencode, quote_plus
 reload(sys)
 sys.setdefaultencoding('utf-8')  # @UndefinedVariable
 
-print urlencode({'' : u'西城店店长'})[1:]
+if 1:
+    info_query_str = "$.dialog('/shair/memberArchives!editMember.action?id=209306376&shopid=118871&flag=1&ts='+new Date().getTime(),'80%',true,true)"
+    info_query_str = info_query_str[info_query_str.find('?') + 1:]
+    info_query_str = info_query_str[:info_query_str.find("'")]
+    print info_query_str
+    sys.exit(0)
+sys.exit(0)
 
 a = {'1' : '1'}
 for k,v in a.items():

@@ -2,13 +2,13 @@
 
 import redis
 import traceback
-from zefun_spider.settings import redis_df_db, redis_host, redis_port
+from zefun_spider.settings import redis_df_db, redis_host, redis_port, redis_pwd
 
 class RedisHelper():
 
     @staticmethod
     def get_redis_conn(db=redis_df_db):
-        return redis.Redis(host=redis_host, port=redis_port, db=db)
+        return redis.Redis(host=redis_host, port=redis_port, db=db, password=redis_pwd)
 
     @staticmethod
     def close_redis_conn(rconn):

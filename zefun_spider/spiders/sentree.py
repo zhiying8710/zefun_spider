@@ -1,4 +1,4 @@
-# coding: utf-8
+#coding: utf-8
 from collections import OrderedDict
 import datetime
 import json
@@ -18,62 +18,89 @@ import xlwt
 from zefun_spider import utils, settings
 from zefun_spider.items import SentreeShuiDanShenChaItem, SentreeMembersCsvItem,\
     SentreeMembersSimpleItem, SentreeEmployeeItem, SentreeServiceItem,\
-    SentreeMemberCardItem
-from zefun_spider.settings import result_dir
+    SentreeMemberCardItem, SentreeMemberTreatItem
+from zefun_spider.settings import result_dir, running_auths_key
 from zefun_spider.spiders import CommonSpider
 from zefun_spider.utils import dama, str_list_strip, str_list_strip_replace
 from scrapy.http.cookies import CookieJar
+import shutil
+import uuid
+import sys
+from zefun_spider.utils.conns_helper import RedisHelper
+import re
 
 class SentreeSpider(CommonSpider):
 
     name = 'sentree'
 
-    def __init__(self, **kwagrs):
+    def __init__(self, *args, **kwargs):
+        super(SentreeSpider, self).__init__(*args, **kwargs)
+        self.kwargs = kwargs;
         self.start_urls = ['http://vip6.sentree.com.cn/shair/loginAction.action?from=base']
         self.domain = 'http://vip6.sentree.com.cn'
         self.login_url = 'http://vip6.sentree.com.cn/shair/loginAction!ajaxLogin.action'
         self.login_rand = 'http://vip6.sentree.com.cn/shair/vc'
-        self.login_username = u'西城店店长'
-        self.login_password = '15977340369dz'
+
+    def __info_props(self):
+        self.login_username = self.kwargs['username']
+        log.start(logfile=settings.get_log_file(self.login_username), loglevel=settings.LOG_LEVEL, crawler=self.crawler)
+        RedisHelper.get_redis_conn().sadd(running_auths_key, self.login_username)
+        self.login_password = self.kwargs['password']
         self.start_time = time.time()
-        self.member_xls_key = '__%s_xls_members_%d' % (self.name, self.start_time)
-        if not os.path.exists(result_dir):
-            os.makedirs(result_dir)
-        self.member_result_xls = '%s/members_%d.xls' % (result_dir, self.start_time)
+        uid = uuid.uuid3(uuid.NAMESPACE_X500, self.login_username)
+        self.member_xls_key = '__origin_xls_members_%s_%d' % (uid, self.start_time)
+        self.res_dir = result_dir
+        if not self.res_dir.endswith('/'):
+            self.res_dir = '%s/' % (self.res_dir, )
+        self.res_dir = '%s%s' % (self.res_dir, self.login_username)
+        shutil.rmtree(self.res_dir, ignore_errors=True)
+        if not os.path.exists(self.res_dir):
+            os.makedirs(self.res_dir)
+        self.member_result_xls = '%s/members_%d.xls' % (self.res_dir, self.start_time)
         self.member_result_xsl_book = xlwt.Workbook()
         self.member_result_xsl_sheet = self.member_result_xsl_book.add_sheet(u'会员资料')
         self.member_result_rows = 0
         self.member_result_semaphore = multiprocessing.Semaphore(1)
         self.member_origin_result_ready = False
-        self.member_headers = [u'手机号', u'姓名', u'性别', u'会员分类', u'注册日期', u'卡号', u'卡名称', u'卡类型', u'折扣', u'储值总额', u'消费总额', u'卡内总余额', u'赠送总余额', u'失效日期', u'消费次数', u'当前积分', u'最后消费日']
+        self.member_headers = [u'手机号', u'姓名', u'性别', u'会员分类', u'注册日期', u'卡号', u'卡名称', u'卡类型', u'折扣', u'储值总额', u'消费总额', u'卡内总余额', u'赠送总余额', u'失效日期', u'消费次数', u'当前积分', u'最后消费日', u'欠款']
 
         self.employee_result_semaphore = multiprocessing.Semaphore(1)
-        self.employee_result_xls = '%s/employees_%d.xls' % (result_dir, self.start_time)
+        self.employee_result_xls = '%s/employees_%d.xls' % (self.res_dir, self.start_time)
         self.employee_result_xsl_book = xlwt.Workbook()
         self.employee_result_xsl_sheet = self.employee_result_xsl_book.add_sheet(u'员工资料')
         self.employee_result_rows = 0
 
         self.service_result_semaphore = multiprocessing.Semaphore(1)
-        self.service_result_xls = '%s/services_%d.xls' % (result_dir, self.start_time)
+        self.service_result_xls = '%s/services_%d.xls' % (self.res_dir, self.start_time)
         self.service_result_xsl_book = xlwt.Workbook()
         self.service_result_xsl_sheet = self.service_result_xsl_book.add_sheet(u'服务项目')
         self.service_result_rows = 0
 
         self.membercard_result_semaphore = multiprocessing.Semaphore(1)
-        self.membercard_result_xls = '%s/membercards_%d.xls' % (result_dir, self.start_time)
+        self.membercard_result_xls = '%s/membercards_%d.xls' % (self.res_dir, self.start_time)
         self.membercard_result_xsl_book = xlwt.Workbook()
         self.membercard_result_xsl_sheet = self.membercard_result_xsl_book.add_sheet(u'会员卡')
         self.membercard_result_rows = 0
 
+        self.member_treat_key = '__member_treats_%s_%d' % (uid, self.start_time)
+        self.member_treat_result_xsl = '%s/membertreats_%d.xls' % (self.res_dir, self.start_time)
+        self.member_treat_result_xsl_book = xlwt.Workbook()
+        self.member_treat_result_xsl_sheet = self.member_treat_result_xsl_book.add_sheet(u'疗程项目')
+        self.member_treat_rows = 0
 
-    def start_requests(self):
-        yield Request(url=self.start_urls[0], callback=self.preper_login, meta={'cookie_jar' : CookieJar()})
+
+    def start_requests(self,):
+        if not self.kwargs or not 'username' in self.kwargs or not 'password' in self.kwargs:
+            self.log("usage: scrapy crawl -a username=<username> -a password=<password> %s" % self.name, level=log.ERROR)
+        else:
+            self.__info_props()
+            yield Request(url=self.start_urls[0], callback=self.preper_login, meta={'cookie_jar' : CookieJar()})
 
     def preper_login(self, resp):
         yield Request(url='%s?r=%d' % (self.login_rand, time.time()), callback=self.start_login, meta=resp.meta)
 
     def start_login(self, resp):
-        path = settings.IMAGES_STORE + ("/vc_%d.jpg" % time.time())
+        path = "%s/vc_%d.jpg" % (self.res_dir, time.time())
         with open(path, "wb") as f:
             f.write(resp.body)
         rand = None
@@ -239,16 +266,17 @@ class SentreeSpider(CommonSpider):
         r = time.time()
         urls = {
                 'http://vip6.sentree.com.cn/shair/memberInfo!memberlist.action?set=manage&r=%d' % r  : [self.parse_showdesk_members, {'r' : r}],
-#                 'http://vip6.sentree.com.cn/shair/employee!employeeInfo.action?set=manage&r=%d' % r : [self.parse_showdesk_employees, {'r' : r}],
-#                 'http://vip6.sentree.com.cn/shair/serviceItemSet!init.action?set=manage&r=%d' % r : [self.parse_showdesk_services, {'r' : r}],
-#                 'http://vip6.sentree.com.cn/shair/cardTypeSet!getList.action?set=manage&r=%d' % r : [self.parse_showdesk_membercards, {'r' : r}],
+                'http://vip6.sentree.com.cn/shair/timesItem!initTreat.action?set=manage&r=%d' % r : [self.parse_showdesk_members_treat, {'r' : r, 'page' : 1}],
+                'http://vip6.sentree.com.cn/shair/employee!employeeInfo.action?set=manage&r=%d' % r : [self.parse_showdesk_employees, {'r' : r}],
+                'http://vip6.sentree.com.cn/shair/serviceItemSet!init.action?set=manage&r=%d' % r : [self.parse_showdesk_services, {'r' : r}],
+                'http://vip6.sentree.com.cn/shair/cardTypeSet!getList.action?set=manage&r=%d' % r : [self.parse_showdesk_membercards, {'r' : r}],
                 }
         for url, info in urls.items():
             yield Request(url=url, callback=info[0], meta=info[1])
 
 
     def parse_showdesk_members_save_xls(self, resp):
-        path = settings.IMAGES_STORE + ("/member_origin_%d.xls" % time.time())
+        path = "%s/member_origin_%d.xls" % (self.res_dir, self.start_time)
         with open(path, "wb") as f:
             f.write(resp.body)
         csv_item = SentreeMembersCsvItem()
@@ -265,23 +293,45 @@ class SentreeSpider(CommonSpider):
                          }, callback=self.parse_showdesk_members2, meta=meta)
 
     def parse_showdesk_members(self, resp):
-        yield FormRequest(url="http://vip6.sentree.com.cn/shair/memberInfo!exportmember.action?set=manage", formdata={'memberForm.shopid' : '33082', 'memberForm.birthtype' : '1', 'memberForm.invalidflag' : '0'}, meta=resp.meta, callback=self.parse_showdesk_members_save_xls)
+        yield FormRequest(url="http://vip6.sentree.com.cn/shair/memberInfo!exportmember.action?set=manage", formdata={'memberForm.shopid' : Selector(resp).xpath('//input[@id="pageShopId"]/@value').extract()[0], 'memberForm.birthtype' : '1', 'memberForm.invalidflag' : '0'}, meta=resp.meta, callback=self.parse_showdesk_members_save_xls)
 
     def parse_showdesk_members2(self, resp):
         hxs = Selector(resp)
+        next_page_nodes = hxs.xpath('//a[@class="next_page"]')
+        meta = resp.meta
+        if next_page_nodes and meta['page'] == 1:
+            next_page_node = next_page_nodes[0]
+            total_page = next_page_node.xpath('./parent::li/preceding-sibling::li')[-1].xpath('a/child::text()').extract()[0].strip()
+            for i in xrange(2, int(total_page) + 1):
+                new_meta = dict(meta)
+                new_meta['page'] = i
+                self.log('%s yield member list page %d' % (self.name, i))
+                yield FormRequest(url="http://vip6.sentree.com.cn/shair/memberInfo!memberlist.action", formdata={
+                             'page.currNum' : str(i),
+                             'page.rpp' : '30',
+                             'r' : str(meta['r']),
+                             'set' : 'manage'
+                             }, callback=self.parse_showdesk_members2, meta=new_meta)
+
         member_nodes = hxs.xpath('//form[@id="delForm"]//table/tbody/tr')
         if member_nodes:
             for m_n in member_nodes:
                 member_tds = m_n.xpath('td')
+                info_query_str = None
                 try:
                     phone = member_tds[1].xpath('a/child::text()').extract()[0].replace('&nbsp;', '').strip()
                     name = member_tds[2].xpath('span/child::text()').extract()[0].replace('&nbsp;', '').strip()
                     card_no = member_tds[6].xpath('table/tr/td[1]/a/child::text()').extract()[0].replace('&nbsp;', '').strip()
+                    info_query_str = member_tds[6].xpath('table/tr/td[1]/a/@onclick').extract()[0]
+                    info_query_str = info_query_str[info_query_str.find('?') + 1:]
+                    info_query_str = info_query_str[:info_query_str.find("'")]
                     card_name = member_tds[6].xpath('table/tr/td[2]/child::text()').extract()[0].replace('&nbsp;', '').strip()
                     card_type = member_tds[6].xpath('table/tr/td[3]//child::text()').extract()[0].replace('&nbsp;', '').replace(' ', '').strip()
                     discont = member_tds[6].xpath('table/tr/td[4]/child::text()').extract()[0].replace('&nbsp;', '').replace(' ', '').strip()
                     timeout = member_tds[6].xpath('table/tr/td[9]/child::text()').extract()[0].replace('&nbsp;', '').replace(' ', '').strip()
+                    overage = str_list_strip_replace(member_tds[6].xpath('table/tr/td[7]//child::text()').extract(), ['&nbsp;', ' ', '\t', '\n'])
                 except:
+                    self.log(traceback.format_exc())
                     continue
                 mem_item = SentreeMembersSimpleItem()
                 mem_item[u'phone'] = phone
@@ -291,19 +341,49 @@ class SentreeSpider(CommonSpider):
                 mem_item[u'card_type'] = card_type
                 mem_item[u'discont'] = discont
                 mem_item[u'timeout'] = timeout
-#                 items.append(mem_item)
-                yield mem_item
-        meta = resp.meta
-        next_page_nodes = hxs.xpath('//a[@class="next_page"]')
-        if next_page_nodes and (len(next_page_nodes) > 1 or meta['page'] == 1):
-            page = meta['page'] + 1
-            meta['page'] = page
-            yield FormRequest(url="http://vip6.sentree.com.cn/shair/memberInfo!memberlist.action", formdata={
-                         'page.currNum' : str(page),
-                         'page.rpp' : '30',
-                         'r' : str(meta['r']),
-                         'set' : 'manage'
-                         }, callback=self.parse_showdesk_members2, meta=meta)
+                mem_item[u'overage'] = overage
+                if info_query_str:
+                    new_meta = dict(meta)
+                    new_meta['item'] = mem_item
+                    yield Request(url='http://vip6.sentree.com.cn/shair/memberArchives!editMember.action?%s%d' % (info_query_str, time.time()), callback=self.parse_member_overdraft, meta=new_meta)
+                else:
+                    mem_item['overdraft'] = '0.0'
+                    yield mem_item
+
+    def parse_member_overdraft(self, resp):
+        hxs = Selector(resp)
+        mem_item = resp.meta['item']
+        overdraft_click_nodes = hxs.xpath('//ul[@class="tab-nav"]//a[@href="#tab7"]/@onclick')
+        if not overdraft_click_nodes:
+            mem_item['overdraft'] = '0.0'
+            yield mem_item
+        else:
+            click_str = overdraft_click_nodes.extract()[0]
+            ids = re.findall(r'\d+', click_str)
+            yield FormRequest(url='http://vip6.sentree.com.cn/shair/memberArchives!debtlist.action', formdata={'id' : ids[0], 'shopid' : ids[1]}, callback=self.parse_member_overdraft2, meta=resp.meta)
+
+    def parse_member_overdraft2(self, resp):
+        mem_item = resp.meta['item']
+        hxs = Selector(resp)
+        total_overdraft_nodes = hxs.xpath('//div[@class="table-responsive"]/table/tbody/tr/td[3]/child::text()')
+        if not total_overdraft_nodes:
+            overdraft = '0.0'
+        else:
+            overdrafts = str_list_strip_replace(total_overdraft_nodes.extract(), ['&nbsp;', ' ', '\t', '\n'])
+            overdraft_statuss = str_list_strip_replace(hxs.xpath('//div[@class="table-responsive"]/table/tbody/tr/td[5]/font/child::text()').extract(), ['&nbsp;', ' ', '\t', '\n'])
+            overdraft = float(0)
+            for i, s_overdraft in enumerate(overdrafts):
+                f_overdraft = float(s_overdraft)
+                if u'已还清' in overdraft_statuss[i]:
+                    overdraft = overdraft - f_overdraft
+                    continue
+                if u'未还清' in overdraft_statuss[i]:
+                    overdraft = overdraft + f_overdraft
+            if overdraft < 0:
+                overdraft = float(0)
+            overdraft = '%.1f' % overdraft
+        mem_item['overdraft'] = overdraft
+        yield mem_item
 
     def parse_showdesk_employees(self, resp):
         hxs = Selector(resp)
@@ -401,6 +481,43 @@ class SentreeSpider(CommonSpider):
 #             items.append(info)
             yield item
 
+
+    def parse_showdesk_members_treat(self, resp):
+        hxs = Selector(resp)
+        next_page_nodes = hxs.xpath('//a[@class="next_page"]')
+        meta = resp.meta
+        if next_page_nodes and meta['page'] == 1:
+            next_page_node = next_page_nodes[0]
+            total_page = next_page_node.xpath('./parent::li/preceding-sibling::li')[-1].xpath('a/child::text()').extract()[0].strip()
+            for i in xrange(2, int(total_page) + 1):
+                new_meta = dict(meta)
+                new_meta['page'] = i
+                self.log('%s yield member list page %d' % (self.name, i))
+                yield FormRequest(url="http://vip6.sentree.com.cn/shair/timesItem!initTreat.action", formdata={
+                             'page.currNum' : str(i),
+                             'page.rpp' : '30',
+                             'r' : str(meta['r']),
+                             'set' : 'manage'
+                             }, callback=self.parse_showdesk_members_treat, meta=new_meta)
+        treat_info_tabs = hxs.xpath('//div[@class="page_main"]//div[@class="table-responsive"]/table')
+        if not treat_info_tabs:
+            yield None
+            return
+        treat_info_tab = treat_info_tabs[0]
+        ths = str_list_strip_replace(treat_info_tab.xpath('./thead/tr/th/child::text()').extract(), [' ', '\t', '\n', '&nbsp;'])
+
+        info_nodes = treat_info_tab.xpath('./tbody/tr')
+        for i_n in info_nodes:
+            infos = []
+            info_tds = i_n.xpath('./td')
+            for i_t in info_tds:
+                info = ''.join(str_list_strip_replace(i_t.xpath('.//child::text()').extract(), [' ', '\t', '\n', '&nbsp;']))
+                infos.append(info)
+            item = SentreeMemberTreatItem()
+            item['hs'] = ths
+            item['vals'] = infos
+            yield item
+
 items = []
 
 if __name__ == '__main__':
@@ -412,6 +529,17 @@ if __name__ == '__main__':
     f.close()
 
     resp = TextResponse(url="", body=html)
+    if 1:
+        hxs = Selector(resp)
+        total_overdraft_nodes = hxs.xpath('//div[@class="table-responsive"]/table/tbody/tr/td[3]')
+        total_overdraft_nodes = hxs.xpath('//div[@class="table-responsive"]/table/tbody/tr/td[3]/child::text()')
+        if not total_overdraft_nodes:
+            overdraft = '0'
+        else:
+            overdraft = str_list_strip_replace(total_overdraft_nodes.extract(), ['&nbsp;', ' ', '\t', '\n'])[0]
+        print overdraft
+    sys.exit(0)
+
     s = SentreeSpider()
     try:
         s.parse_showdesk_services(resp)

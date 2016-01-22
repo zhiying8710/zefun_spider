@@ -3,11 +3,19 @@
 1. 安装scrapy
     a. 检查python版本, 最好是2.7以上
     b. 安装pip
-    c. pip install scrapy, 会安装相关依赖, 在此之前可能还需要运行的命令, 以centOS为例: yum install python-devel,pip install PIL, pip install service_identity, pip install xlwt, pip install xlrd, pip install redis, pip install cryptography, yum install libffi libffi-devel,  yum install -y libxml libxml2 libxml2-devel libxslt libxslt-devel
+    c. pip install 'scrapy==0.24', 指定安装0.24版本, 会安装相关依赖, 在此之前可能还需要运行的命令, 以centOS为例: yum install python-devel,pip install PIL, pip install service_identity, pip install xlwt, pip install xlrd, pip install redis, pip install cryptography, yum install libffi libffi-devel,  yum install -y libxml libxml2 libxml2-devel libxslt libxslt-devel
 
 2. 运行sentree爬虫
     a. cd zefun_spider
-    b. 查  看和修改配置: vi zefun_spider/settings.py, 主要注意result_dir和redis的配置及LOG_FILE, result_dir是指抓取结果的存放目录, LOG_FILE是指日志文件, 它和result_dir的文件夹路经都必须事先创建
-    c. 开始运行: scrapy crawl sentree
-    d. 查看爬虫日志, log/zefun_spider.log
-    e. 查看结果, cd到前面配置的result_dir, 会出现3个xls文件, members_xxx.xls是会员资料, employees_xxx.xls是员工资料, services_xxx.xls是会员项目, membercards_xxx.xls是会员卡
+    b. 查  看和修改配置: vi zefun_spider/settings.py, 主要注意result_dir和redis的配置及LOG_FILE, result_dir是指抓取结果的存放目录, 每个用户名下的结果都会出现在result_dir目录下已用户名命名的文件夹下, LOG_FILE是指日志文件, 它和result_dir的文件夹路经都必须事先创建
+    c. 开始运行: scrapy crawl -a username='西城店店长' -a password='15977340369dz' sentree
+    d. 查看爬虫日志, log/zefun_spider_.log, 这个是总日志文件, 每个用户名下都会有一个日志文件, 例如log/zefun_spider_西城店店长.log, 出现类似[sentree] INFO: Spider closed (finished)的日志说明一个爬虫运行结束, 抓完了 一个用户名下的记录
+    e. 查看结果, cd到前面配置的result_dir下对应的用户名的目录, 会出现5个xls文件, members_xxx.xls是会员资料, employees_xxx.xls是员工资料, services_xxx.xls是会员项目, membercards_xxx.xls是会员卡, membertreats_xxx.xls是会员疗程项目
+
+3. 使用crawl_sentree.py
+                直接运行python crawl_sentree.py可以看到帮助提示,
+                其中authfile和auth_key必须有一个有值, 如果配置了authfile, auth_key会被忽略, redis使用的是settings.py中的配置
+                如果使用authfile, 则会按照authfile里配置的顺序挨个登录抓取
+                如果使用reids, 则会监听auth_key, 它是个list, 用户名和密码用配置的delimiter分隔, 每向该key中放入一个用户名和密码对, 则会启动一个对应的爬虫, 使用redis意味着这种模式可分布式部署
+                每个正在抓取的账号密码都会在setting.py中的running_auths_key注册一次, 完成时删除, 在crawl_sentree.py脚本启动时需要判断是否有必要手动在redis中清除该key
+

@@ -20,6 +20,7 @@ ITEM_PIPELINES = {
     'zefun_spider.pipelines.SentreeEmployeeItemPipeline' : 502,
     'zefun_spider.pipelines.SentreeServiceItemPipeline' : 502,
     'zefun_spider.pipelines.SentreeMemberCardItemPipeline' : 502,
+    'zefun_spider.pipelines.SentreeMemberTreatItemPipeline' : 502,
 }
 
 DOWNLOAD_TIMEOUT = 60
@@ -27,7 +28,12 @@ CONCURRENT_REQUESTS = 8
 USER_AGENT = 'Mozilla/5.0 (Windows NT 5.1) AppleWebKit/535.11 (KHTML, like Gecko) Chrome/17.0.963.79 Safari/535.11'
 
 LOG_ENABLED = True
-LOG_FILE = './log/zefun_spider.log'
+def get_log_file(suffix=None):
+    if not suffix:
+        suffix = ""
+    return './log/zefun_spider_%s.log' % suffix
+LOG_FILE = get_log_file()
+
 LOG_LEVEL = 'DEBUG'
 
 ROBOTSTXT_OBEY = False
@@ -40,5 +46,7 @@ COOKIES_DEBUG=True
 redis_host = '127.0.0.1'
 redis_port = 6379
 redis_df_db = 15
+redis_pwd = 'livesALL2015'
+running_auths_key = 'running_auths'
 
 result_dir = '/root/zefun_spider_result'

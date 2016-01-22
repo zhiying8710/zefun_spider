@@ -1,6 +1,7 @@
 # coding: utf-8
 import datetime
 
+
 def new_list(l=[], element=None):
     nl = [e for e in l]
     nl.append(element)

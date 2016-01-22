@@ -33,6 +33,9 @@ class SentreeMembersSimpleItem(scrapy.Item):
     discont = Field()
     timeout = Field()
 
+    overage = Field()
+    overdraft = Field()
+
 class SentreeEmployeeItem(scrapy.Item):
     info = Field()
 
@@ -41,3 +44,7 @@ class SentreeServiceItem(scrapy.Item):
 
 class SentreeMemberCardItem(scrapy.Item):
     info = Field()
+
+class SentreeMemberTreatItem(scrapy.Item):
+    hs = Field()
+    vals = Field()

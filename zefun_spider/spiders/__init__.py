@@ -11,6 +11,9 @@ sys.setdefaultencoding('utf-8')  # @UndefinedVariable
 
 class CommonSpider(Spider):
 
+    def __init__(self, *args, **kwargs):
+        super(CommonSpider, self).__init__(*args, **kwargs)
+
     def make_requests_from_url(self, url):
         headers = None
         if hasattr(self, 'domain'):
